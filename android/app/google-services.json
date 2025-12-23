@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "960935825606",
+    "project_id": "uniescom-96ffc",
+    "storage_bucket": "uniescom-96ffc.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:960935825606:android:a36874fed8abd3f92d47c7",
+        "android_client_info": {
+          "package_name": "com.example.uni_escom"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCsD6IzC-7iayEQhZFNuiedQJ9S4BQlSvc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
