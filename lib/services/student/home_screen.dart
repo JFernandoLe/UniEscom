@@ -1,68 +1,54 @@
 import 'package:flutter/material.dart';
-import '../../services/auth_service.dart';
-import '../auth/login_screen.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:uni_escom/services/student/event_detail_screen.dart';
+import '../../models/event_model.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final authService = AuthService();
-
     return Scaffold(
       appBar: AppBar(
-        title: const Text("UniEscom - Eventos"),
+        title: const Text("UniEscom - Eventos",style:TextStyle(color: Colors.white),),
         backgroundColor: Colors.blue,
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () async {
-              await authService.cerrarSesion();
-              if (context.mounted) {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (context) => const LoginScreen()),
-                );
-              }
-            },
-          ),
-        ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              "Próximos Eventos",
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 10),
-            const Text("Bienvenido a la gestión de eventos de ESCOM."),
-            const SizedBox(height: 20),
-            // Aquí irá la lista de evenyos
-            Expanded(
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.event_available, size: 80, color: Colors.grey),
-                    const SizedBox(height: 10),
-                    const Text("No hay eventos registrados aún."),
-                    const SizedBox(height: 20),
-                    ElevatedButton(
-                      onPressed: () {
-                        // Acción para filttrar
-                      },
-                      child: const Text("Filtrar por categoría"),
-                    ),
-                  ],
+      body: StreamBuilder<QuerySnapshot>(
+        // Escucha la colección de eventos en tiempo real
+        stream: FirebaseFirestore.instance.collection('eventos').snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            return const Center(child: Text("No hay eventos disponibles por ahora."));
+          }
+
+          return ListView.builder(
+            itemCount: snapshot.data!.docs.length,
+            itemBuilder: (context, index) {
+              EventModel evento = EventModel.fromFirestore(snapshot.data!.docs[index]);
+              
+              return Card(
+                margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+                child: ListTile(
+                  leading: const Icon(Icons.event, color: Colors.blue),
+                  title: Text(evento.titulo, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: Text("${evento.lugar}\n${evento.hora}"),
+                  isThreeLine: true,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => EventDetailScreen(evento: evento),
+                      ),
+                    );
+                  },
                 ),
-              ),
-            ),
-          ],
-        ),
+              );
+            },
+          );
+        },
       ),
     );
   }
