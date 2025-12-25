@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:uni_escom/services/organizer/attendees_screen.dart';
+import 'package:uni_escom/services/organizer/edit_event_screen.dart';
 import '../../models/event_model.dart';
 
 class EventDetailScreen extends StatelessWidget {
@@ -62,6 +64,75 @@ class EventDetailScreen extends StatelessWidget {
             const SizedBox(height: 10),
             Text(evento.descripcion),
             const Spacer(),
+            if (FirebaseAuth.instance.currentUser?.uid == evento.organizador)
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, foregroundColor: Colors.white),
+                      icon: const Icon(Icons.edit),
+                      label: const Text("EDITAR"),
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => EditEventScreen(evento: evento)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+                      icon: const Icon(Icons.delete),
+                      label: const Text("CANCELAR"),
+                      onPressed: () {
+                        // Confirmación de seguridad
+                        showDialog(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: const Text("¿Cancelar evento?"),
+                            content: const Text("Esta acción eliminará el evento permanentemente."),
+                            actions: [
+                              TextButton(onPressed: () => Navigator.pop(context), child: const Text("No")),
+                              TextButton(
+                                onPressed: () async {
+                                  await FirebaseFirestore.instance.collection('eventos').doc(evento.id).delete();
+                                  if (context.mounted) {
+                                    Navigator.pop(context); // Cierra el dialogo
+                                    Navigator.pop(context); // Regresa al Home
+                                  }
+                                }, 
+                                child: const Text("Sí, eliminar", style: TextStyle(color: Colors.red))
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            if (FirebaseAuth.instance.currentUser?.uid == evento.organizador)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.people),
+                    label: const Text("VER LISTA DE ASISTENTES"),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => AttendeesScreen(
+                            eventoId: evento.id,
+                            eventoNombre: evento.titulo,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
             SizedBox(
               width: double.infinity,
               height: 50,

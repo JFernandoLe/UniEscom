@@ -98,6 +98,27 @@ class _LoginScreenState extends State<LoginScreen> {
                 },
                 child: const Text("¿No tienes cuenta? Regístrate aquí"),
               ),
+              TextButton(
+                onPressed: () async {
+                  if (_emailController.text.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("Ingresa tu correo institucional primero")),
+                    );
+                    return;
+                  }
+                  try {
+                    await _authService.recuperarContrasena(_emailController.text.trim());
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("Enlace de recuperación enviado a tu correo"), backgroundColor: Colors.green),
+                    );
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
+                    );
+                  }
+                },
+                child: const Text("¿Olvidaste tu contraseña?"),
+              ),
             ],
           ),
         ),
