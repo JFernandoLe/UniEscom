@@ -60,6 +60,38 @@ class EventDetailScreen extends StatelessWidget {
               ],
             ),
             const Divider(height: 40),
+            StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('eventos')
+                  .doc(evento.id)
+                  .collection('avisos')
+                  .orderBy('fecha', descending: true)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) return const SizedBox();
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text("⚠️ AVISOS RECIENTES", 
+                      style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 5),
+                    ...snapshot.data!.docs.map((doc) => Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.amber),
+                      ),
+                      child: Text(doc['mensaje'], style: const TextStyle(fontSize: 14)),
+                    )).toList(),
+                    const Divider(),
+                  ],
+                );
+              },
+            ),
             const Text("Descripción", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
             Text(evento.descripcion),
