@@ -1,0 +1,6 @@
+{
+  "cmake.sourceDirectory": "C:/Users/vale_/Documents/ESCUELA/ESCOM/7mo semestre/DAWN/UniEscom/linux",
+  "terminal.integrated.env.windows": {
+    "Path": "C:\\Users\\vale_\\tools;C:\\Windows\\System32;C:\\Windows\\System32\\WindowsPowerShell\\v1.0;C:\\Program Files\\Git\\cmd;${env:LOCALAPPDATA}\\Pub\\Cache\\bin;${env:Path}"
+  }
+}

@@ -5,10 +5,8 @@ import 'package:uni_escom/services/auth/login_screen.dart';
 import 'package:uni_escom/services/auth_service.dart';
 import 'package:uni_escom/services/organizer/create_event_screen.dart';
 import 'package:uni_escom/services/student/event_detail_screen.dart';
-import 'package:uni_escom/services/student/profile_screen.dart'; 
+import 'package:uni_escom/services/student/profile_screen.dart';
 import '../../models/event_model.dart';
-
-
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -18,151 +16,193 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  String userRol = 'estudiante'; 
+  String userRol = 'estudiante';
+
   @override
   void initState() {
     super.initState();
     _checkRole();
   }
-  // 2. Función para leer el rol desde Firestore
-    void _checkRole() async {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        final doc = await FirebaseFirestore.instance.collection('usuarios').doc(user.uid).get();
-        if (mounted) {
-          setState(() {
-            userRol = doc.data()?['rol'] ?? 'estudiante';
-          });
-        }
-      }
+
+  Future<void> _checkRole() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      final doc = await FirebaseFirestore.instance.collection('usuarios').doc(user.uid).get();
+      if (!mounted) return;
+      setState(() {
+        userRol = doc.data()?['rol'] ?? 'estudiante';
+      });
     }
-  // Categoría seleccionada por defecto
+  }
+
   String categoriaSeleccionada = 'Todo';
-  
+
   @override
   Widget build(BuildContext context) {
-    // Definimos la consulta base a Firestore
+    final cs = Theme.of(context).colorScheme;
+
     Query query = FirebaseFirestore.instance.collection('eventos');
-    
-    // Si no es 'Todo', filtramos por la categoría seleccionada (RF-007)
     if (categoriaSeleccionada != 'Todo') {
       query = query.where('categoria', isEqualTo: categoriaSeleccionada);
     }
-    
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text("UniEscom - Eventos", style: TextStyle(color: Colors.white)),
-        backgroundColor: Colors.blue,
-        elevation: 0,
+        title: const Text("UniEscom - Eventos"), // ya no forzamos color
         actions: [
           IconButton(
-            icon: const Icon(Icons.person_outline, color: Colors.white),
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const ProfileScreen())),
+            icon: const Icon(Icons.person_outline),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const ProfileScreen()),
+            ),
           ),
           IconButton(
-            icon: const Icon(Icons.logout, color: Colors.white),
+            icon: const Icon(Icons.logout),
             tooltip: 'Cerrar Sesión',
             onPressed: () async {
               final authService = AuthService();
               await authService.cerrarSesion();
-              
-              if (mounted) {
-                // Regresamos al Login y limpiamos el historial de navegación
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(builder: (context) => const LoginScreen()),
-                  (route) => false,
-                );
-              }
+
+              if (!mounted) return;
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (context) => const LoginScreen()),
+                (route) => false,
+              );
             },
           ),
         ],
       ),
-      floatingActionButton: userRol == 'organizador' 
-      ? FloatingActionButton(
-          backgroundColor: Colors.blue,
-          child: const Icon(Icons.add, color: Colors.white),
-          onPressed: () {
-            // Navegar a la pantalla de creación
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const CreateEventScreen()),
-            );
-          },
-        )
-      : null,
+
+      floatingActionButton: userRol == 'organizador'
+          ? FloatingActionButton(
+              // usa el color del theme
+              backgroundColor: cs.primary,
+              foregroundColor: cs.onPrimary,
+              child: const Icon(Icons.add),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const CreateEventScreen()),
+                );
+              },
+            )
+          : null,
+
       body: Column(
         children: [
-          // --- SECCIÓN DE FILTROS (RF-007) ---
+          // FILTROS
           Container(
-            color: Colors.blue.withOpacity(0.1),
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: cs.primary.withOpacity(0.06),
+              border: Border(
+                bottom: BorderSide(color: Colors.black.withOpacity(0.06)),
+              ),
+            ),
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
               child: Row(
                 children: ['Todo', 'Académico', 'Cultural', 'Deportivo'].map((cat) {
+                  final selected = categoriaSeleccionada == cat;
+
                   return Padding(
                     padding: const EdgeInsets.only(right: 8.0),
                     child: FilterChip(
                       label: Text(cat),
-                      selected: categoriaSeleccionada == cat,
-                      selectedColor: Colors.blue.withOpacity(0.3),
-                      checkmarkColor: Colors.blue,
-                      onSelected: (bool selected) {
-                        setState(() {
-                          categoriaSeleccionada = cat;
-                        });
-                      },
+                      selected: selected,
+                      onSelected: (_) => setState(() => categoriaSeleccionada = cat),
+                      // Material 3 + theme
+                      selectedColor: cs.primary.withOpacity(0.18),
+                      checkmarkColor: cs.primary,
+                      side: BorderSide(color: Colors.black.withOpacity(0.10)),
+                      labelStyle: TextStyle(
+                        fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                        color: selected ? cs.primary : cs.onSurface.withOpacity(0.75),
+                      ),
                     ),
                   );
                 }).toList(),
               ),
             ),
           ),
-          
-          // --- LISTA DE EVENTOS (RF-006) ---
+
+          // LISTA
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
-              stream: query.snapshots(), // Escucha la consulta filtrada
+              stream: query.snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
+                  return Center(
+                    child: CircularProgressIndicator(color: cs.primary),
+                  );
                 }
+
                 if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                   return Center(
-                    child: Text("No hay eventos en la categoría: $categoriaSeleccionada"),
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.event_busy, size: 44, color: cs.onSurface.withOpacity(0.40)),
+                          const SizedBox(height: 10),
+                          Text(
+                            "No hay eventos",
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: cs.onSurface),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            "Categoría: $categoriaSeleccionada",
+                            style: TextStyle(color: cs.onSurface.withOpacity(0.65)),
+                          ),
+                        ],
+                      ),
+                    ),
                   );
                 }
 
                 return ListView.builder(
-                  padding: const EdgeInsets.only(top: 10),
+                  padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
                   itemCount: snapshot.data!.docs.length,
                   itemBuilder: (context, index) {
-                    EventModel evento = EventModel.fromFirestore(snapshot.data!.docs[index]);
-                    
+                    final evento = EventModel.fromFirestore(snapshot.data!.docs[index]);
+
                     return Card(
-                      elevation: 2,
-                      margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      elevation: 6,
+                      shadowColor: Colors.black12,
+                      margin: const EdgeInsets.symmetric(vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       child: ListTile(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                         leading: Container(
-                          padding: const EdgeInsets.all(8),
+                          width: 44,
+                          height: 44,
                           decoration: BoxDecoration(
-                            color: Colors.blue.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(8),
+                            color: cs.primary.withOpacity(0.10),
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                          child: const Icon(Icons.calendar_today, color: Colors.blue),
+                          child: Icon(Icons.calendar_today, color: cs.primary, size: 20),
                         ),
-                        title: Text(evento.titulo, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text("${evento.lugar}\n${evento.hora}"),
+                        title: Text(
+                          evento.titulo,
+                          style: const TextStyle(fontWeight: FontWeight.w900),
+                        ),
+                        subtitle: Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            "${evento.lugar}\n${evento.hora}",
+                            style: TextStyle(color: cs.onSurface.withOpacity(0.70)),
+                          ),
+                        ),
                         isThreeLine: true,
-                        trailing: const Icon(Icons.chevron_right),
+                        trailing: Icon(Icons.chevron_right, color: cs.onSurface.withOpacity(0.45)),
                         onTap: () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(
-                              builder: (context) => EventDetailScreen(evento: evento),
-                            ),
+                            MaterialPageRoute(builder: (context) => EventDetailScreen(evento: evento)),
                           );
                         },
                       ),

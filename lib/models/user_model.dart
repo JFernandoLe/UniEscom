@@ -4,6 +4,7 @@ class UserModel {
   final String correo;
   final String rol; // estudiante, organizador, admin
   final List<String> intereses;
+  final String? fotoUrl;
 
   UserModel({
     required this.uid,
@@ -11,6 +12,7 @@ class UserModel {
     required this.correo,
     required this.rol,
     this.intereses = const [],
+    this.fotoUrl,
   });
 
   // Para convertir los datos de Firebase a un objeto de Dart
@@ -21,6 +23,7 @@ class UserModel {
       correo: data['correo'] ?? '',
       rol: data['rol'] ?? 'estudiante',
       intereses: List<String>.from(data['intereses'] ?? []),
+      fotoUrl: data['fotoUrl'],
     );
   }
 }

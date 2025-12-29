@@ -5,51 +5,68 @@ class AttendeesScreen extends StatelessWidget {
   final String eventoId;
   final String eventoNombre;
 
-  const AttendeesScreen({super.key, required this.eventoId, required this.eventoNombre});
-  void _mostrarDialogoAviso(BuildContext context) {
-  final TextEditingController _avisoController = TextEditingController();
+  const AttendeesScreen({
+    super.key,
+    required this.eventoId,
+    required this.eventoNombre,
+  });
 
-  showDialog(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: const Text("Enviar aviso a asistentes"),
-      content: TextField(
-        controller: _avisoController,
-        decoration: const InputDecoration(
-          hintText: "Ej: El evento se movió al salón 4.",
-          border: OutlineInputBorder(),
+  void _mostrarDialogoAviso(BuildContext context) {
+    final avisoController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text("Enviar aviso a asistentes"),
+        content: TextField(
+          controller: avisoController,
+          decoration: const InputDecoration(
+            hintText: "Ej: El evento se movió al salón 4.",
+            border: OutlineInputBorder(),
+          ),
+          maxLines: 3,
         ),
-        maxLines: 3,
-      ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text("CANCELAR")),
-        ElevatedButton(
-          onPressed: () async {
-            if (_avisoController.text.isNotEmpty) {
-              // Guardar el aviso en una sub-colección del evento
+        actions: [
+          TextButton(
+            onPressed: () {
+              avisoController.dispose();
+              Navigator.pop(dialogCtx);
+            },
+            child: const Text("CANCELAR"),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final texto = avisoController.text.trim();
+              if (texto.isEmpty) return;
+
               await FirebaseFirestore.instance
                   .collection('eventos')
                   .doc(eventoId)
                   .collection('avisos')
                   .add({
-                'mensaje': _avisoController.text,
+                'mensaje': texto,
                 'fecha': FieldValue.serverTimestamp(),
+                'eventoId': eventoId,
+                'eventoNombre': eventoNombre,
               });
-              
+
+              if (dialogCtx.mounted) {
+                avisoController.dispose();
+                Navigator.pop(dialogCtx);
+              }
               if (context.mounted) {
-                Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text("Aviso enviado a todos los asistentes")),
                 );
               }
-            }
-          },
-          child: const Text("ENVIAR"),
-        ),
-      ],
-    ),
-  );
-}
+            },
+            child: const Text("ENVIAR"),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -57,13 +74,16 @@ class AttendeesScreen extends StatelessWidget {
         title: Text("Asistentes: $eventoNombre"),
         actions: [
           IconButton(
-            icon: const Icon(Icons.campaign), 
-            onPressed: () => _mostrarDialogoAviso(context)
+            icon: const Icon(Icons.campaign),
+            onPressed: () => _mostrarDialogoAviso(context),
           ),
         ],
       ),
+
+      // OPCIÓN A (rápida): usar nombre/email guardados en "asistencias"
+      // Requiere que cuando registras asistencia guardes:
+      // 'nombre_usuario' y 'email_usuario' en el doc de asistencias.
       body: StreamBuilder<QuerySnapshot>(
-        // Filtramos las asistencias por el ID de este evento
         stream: FirebaseFirestore.instance
             .collection('asistencias')
             .where('id_evento', isEqualTo: eventoId)
@@ -76,14 +96,20 @@ class AttendeesScreen extends StatelessWidget {
             return const Center(child: Text("Aún no hay alumnos registrados."));
           }
 
+          final docs = snapshot.data!.docs;
+
           return ListView.builder(
-            itemCount: snapshot.data!.docs.length,
+            itemCount: docs.length,
             itemBuilder: (context, index) {
-              var asistencia = snapshot.data!.docs[index];
+              final asistencia = docs[index].data() as Map<String, dynamic>;
+
+              final nombre = (asistencia['nombre_usuario'] ?? 'Usuario').toString();
+              final email = (asistencia['email_usuario'] ?? '').toString();
+
               return ListTile(
                 leading: const CircleAvatar(child: Icon(Icons.person)),
-                title: Text("ID Usuario: ${asistencia['id_usuario']}"),
-                subtitle: const Text("Registrado institucionalmente"),
+                title: Text(nombre),
+                subtitle: Text(email.isEmpty ? "Registrado" : email),
               );
             },
           );

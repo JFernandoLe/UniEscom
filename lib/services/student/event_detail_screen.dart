@@ -16,11 +16,12 @@ class EventDetailScreen extends StatelessWidget {
 
     try {
       // Guardar registro en la colección 'asistencias'
-      await FirebaseFirestore.instance.collection('asistencias').add({
+        await FirebaseFirestore.instance.collection('asistencias').add({
         'id_evento': evento.id,
         'id_usuario': user.uid,
         'fecha_registro': FieldValue.serverTimestamp(),
         'nombre_evento': evento.titulo,
+        'fechaHora_evento': Timestamp.fromDate(evento.fechaHora),
       });
 
       if (context.mounted) {
@@ -37,6 +38,7 @@ class EventDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final dt = evento.fechaHora;
     return Scaffold(
       appBar: AppBar(title: Text(evento.titulo)),
       body: Padding(
@@ -56,9 +58,23 @@ class EventDetailScreen extends StatelessWidget {
             Row(
               children: [
                 const Icon(Icons.access_time, color: Colors.blue),
-                Text(" ${evento.hora}"),
+                Text(
+                  " ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}",
+                ),
               ],
             ),
+
+            const SizedBox(height: 10),
+
+            Row(
+              children: [
+                const Icon(Icons.calendar_today, color: Colors.purple),
+                Text(
+                  " ${dt.day}/${dt.month}/${dt.year}",
+                ),
+              ],
+            ),
+
             const Divider(height: 40),
             StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
