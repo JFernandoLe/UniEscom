@@ -85,9 +85,11 @@ class AttendeesScreen extends StatelessWidget {
       // 'nombre_usuario' y 'email_usuario' en el doc de asistencias.
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
-            .collection('asistencias')
-            .where('id_evento', isEqualTo: eventoId)
-            .snapshots(),
+          .collection('asistencias')
+          .where('id_evento', isEqualTo: eventoId)
+          .orderBy('fecha_registro', descending: true)
+          .snapshots(),
+        
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());

@@ -15,26 +15,98 @@ class EventDetailScreen extends StatelessWidget {
     if (user == null) return;
 
     try {
-      // Guardar registro en la colección 'asistencias'
-        await FirebaseFirestore.instance.collection('asistencias').add({
+      // 1) Traer datos del usuario
+      final userDoc = await FirebaseFirestore.instance
+          .collection('usuarios')
+          .doc(user.uid)
+          .get();
+
+      final userData = userDoc.data() ?? {};
+      final nombreUsuario =
+          (userData['nombre'] ?? user.displayName ?? 'Usuario').toString();
+      final emailUsuario =
+          (userData['correo'] ?? user.email ?? '').toString();
+
+      // 2) ID único por evento+usuario
+      final asistenciaId = '${evento.id}_${user.uid}';
+
+      // 3) Crear/actualizar SIEMPRE el mismo doc (sin duplicados)
+      await FirebaseFirestore.instance
+          .collection('asistencias')
+          .doc(asistenciaId)
+          .set({
         'id_evento': evento.id,
         'id_usuario': user.uid,
         'fecha_registro': FieldValue.serverTimestamp(),
         'nombre_evento': evento.titulo,
         'fechaHora_evento': Timestamp.fromDate(evento.fechaHora),
-      });
+
+        // Para AttendeesScreen
+        'nombre_usuario': nombreUsuario,
+        'email_usuario': emailUsuario,
+      }, SetOptions(merge: true));
 
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("¡Te has registrado con éxito!"), backgroundColor: Colors.green),
+          const SnackBar(
+            content: Text("¡Te has registrado con éxito!"),
+            backgroundColor: Colors.green,
+          ),
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red),
-      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red),
+        );
+      }
     }
   }
+
+
+
+  Future<void> _cancelarAsistencia(BuildContext context) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    try {
+      final asistenciaId = '${evento.id}_${user.uid}';
+
+      await FirebaseFirestore.instance
+          .collection('asistencias')
+          .doc(asistenciaId)
+          .delete();
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Registro cancelado ✅"),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Stream<DocumentSnapshot<Map<String, dynamic>>> _miAsistenciaStream() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      // Stream vacío si no hay sesión
+      return const Stream.empty();
+    }
+    final asistenciaId = '${evento.id}_${user.uid}';
+    return FirebaseFirestore.instance
+        .collection('asistencias')
+        .doc(asistenciaId)
+        .snapshots();
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -181,14 +253,30 @@ class EventDetailScreen extends StatelessWidget {
                   ),
                 ),
               ),
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
-                onPressed: () => _registrarAsistencia(context),
-                child: const Text("REGISTRARME AL EVENTO"),
-              ),
+            StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+              stream: _miAsistenciaStream(),
+              builder: (context, snap) {
+                final yaRegistrado = (snap.data?.exists ?? false);
+
+                return SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: yaRegistrado ? Colors.red : Colors.green,
+                      foregroundColor: Colors.white,
+                    ),
+                    onPressed: () {
+                      if (yaRegistrado) {
+                        _cancelarAsistencia(context);
+                      } else {
+                        _registrarAsistencia(context);
+                      }
+                    },
+                    child: Text(yaRegistrado ? "CANCELAR REGISTRO" : "REGISTRARME AL EVENTO"),
+                  ),
+                );
+              },
             ),
           ],
         ),

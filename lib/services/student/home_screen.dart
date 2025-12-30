@@ -6,6 +6,7 @@ import 'package:uni_escom/services/auth_service.dart';
 import 'package:uni_escom/services/organizer/create_event_screen.dart';
 import 'package:uni_escom/services/student/event_detail_screen.dart';
 import 'package:uni_escom/services/student/profile_screen.dart';
+import 'package:uni_escom/services/admin/admin_dashboard_screen.dart';
 import '../../models/event_model.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -50,13 +51,49 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: const Text("UniEscom - Eventos"), // ya no forzamos color
         actions: [
-          IconButton(
-            icon: const Icon(Icons.person_outline),
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const ProfileScreen()),
-            ),
+          StreamBuilder<DocumentSnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('usuarios')
+                .doc(FirebaseAuth.instance.currentUser?.uid)
+                .snapshots(),
+            builder: (context, snap) {
+              String? fotoUrl;
+
+              if (snap.hasData && snap.data!.exists) {
+                final data = snap.data!.data() as Map<String, dynamic>?;
+                fotoUrl = (data?['fotoUrl'] ?? '').toString();
+                if (fotoUrl != null && fotoUrl.trim().isEmpty) fotoUrl = null;
+              }
+
+              return IconButton(
+                tooltip: 'Mi perfil',
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ProfileScreen()),
+                ),
+                icon: CircleAvatar(
+                  radius: 16,
+                  backgroundColor: Colors.white.withOpacity(0.15),
+                  backgroundImage: (fotoUrl != null) ? NetworkImage(fotoUrl) : null,
+                  child: (fotoUrl == null)
+                      ? const Icon(Icons.person_outline, color: Colors.white)
+                      : null,
+                ),
+              );
+            },
           ),
+
+          // 2) Aquí va el IF (solo admin)
+          if (userRol == 'admin')
+            IconButton(
+              icon: const Icon(Icons.admin_panel_settings_outlined),
+              tooltip: 'Admin dashboard',
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AdminDashboardScreen()),
+              ),
+            ),
+
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Cerrar Sesión',
@@ -73,6 +110,7 @@ class _HomeScreenState extends State<HomeScreen> {
             },
           ),
         ],
+
       ),
 
       floatingActionButton: userRol == 'organizador'
