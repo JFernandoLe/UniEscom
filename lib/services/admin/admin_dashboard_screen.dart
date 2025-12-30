@@ -64,6 +64,34 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
+  Future<void> _cambiarSeccionOrg({
+    required String userId,
+    required String nuevaSeccion,
+  }) async {
+    final miUid = FirebaseAuth.instance.currentUser?.uid;
+
+    final admin = await _soyAdmin();
+    if (!admin) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Acceso denegado. Solo admin puede cambiar sección.")),
+      );
+      return;
+    }
+
+    await FirebaseFirestore.instance.collection('usuarios').doc(userId).update({
+      'seccion_org': nuevaSeccion,
+      'seccion_updated_at': FieldValue.serverTimestamp(),
+      'seccion_updated_by': miUid,
+    });
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("Sección actualizada a: $nuevaSeccion ✅"), backgroundColor: Colors.green),
+    );
+  }
+
+
   bool _matchSearch(Map<String, dynamic> data) {
     final q = _searchCtrl.text.trim().toLowerCase();
     if (q.isEmpty) return true;
@@ -166,12 +194,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     final nombre = (data['nombre'] ?? 'Usuario').toString();
                     final correo = (data['correo'] ?? data['email'] ?? '').toString();
                     final rolActual = (data['rol'] ?? 'estudiante').toString();
+                    final seccionActual = (data['seccion_org'] ?? '').toString();
+
 
                     return Card(
                       elevation: 4,
                       shadowColor: Colors.black12,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                       child: ListTile(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        isThreeLine: true,
                         leading: CircleAvatar(
                           backgroundColor: cs.primary.withOpacity(0.12),
                           child: Icon(Icons.person, color: cs.primary),
@@ -179,48 +211,110 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         title: Text(nombre, style: const TextStyle(fontWeight: FontWeight.w800)),
                         subtitle: Text(
                           correo.isEmpty ? "Sin correo" : correo,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(color: cs.onSurface.withOpacity(0.65)),
                         ),
-                        trailing: DropdownButtonHideUnderline(
-                          child: DropdownButton<String>(
-                            value: rolActual,
-                            items: const [
-                              DropdownMenuItem(value: 'estudiante', child: Text("estudiante")),
-                              DropdownMenuItem(value: 'organizador', child: Text("organizador")),
-                              DropdownMenuItem(value: 'admin', child: Text("admin")),
-                            ],
-                            onChanged: (nuevo) async {
-                              if (nuevo == null || nuevo == rolActual) return;
 
-                              // Confirmación
-                              final ok = await showDialog<bool>(
-                                context: context,
-                                builder: (_) => AlertDialog(
-                                  title: const Text("Cambiar rol"),
-                                  content: Text("¿Cambiar a \"$nuevo\"?"),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () => Navigator.pop(context, false),
-                                      child: const Text("Cancelar"),
-                                    ),
-                                    ElevatedButton(
-                                      onPressed: () => Navigator.pop(context, true),
-                                      child: const Text("Confirmar"),
-                                    ),
+                        trailing: ConstrainedBox(
+                          constraints: const BoxConstraints(minWidth: 150),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              // Dropdown de rol
+                              DropdownButtonHideUnderline(
+                                child: DropdownButton<String>(
+                                  isDense: true,
+                                  value: rolActual,
+                                  items: const [
+                                    DropdownMenuItem(value: 'estudiante', child: Text("estudiante")),
+                                    DropdownMenuItem(value: 'organizador', child: Text("organizador")),
+                                    DropdownMenuItem(value: 'admin', child: Text("admin")),
                                   ],
+                                  onChanged: (nuevo) async {
+                                    if (nuevo == null || nuevo == rolActual) return;
+
+                                    final ok = await showDialog<bool>(
+                                      context: context,
+                                      builder: (_) => AlertDialog(
+                                        title: const Text("Cambiar rol"),
+                                        content: Text("¿Cambiar a \"$nuevo\"?"),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(context, false),
+                                            child: const Text("Cancelar"),
+                                          ),
+                                          ElevatedButton(
+                                            onPressed: () => Navigator.pop(context, true),
+                                            child: const Text("Confirmar"),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+
+                                    if (ok != true) return;
+
+                                    await _cambiarRol(
+                                      userId: doc.id,
+                                      nuevoRol: nuevo,
+                                      rolActual: rolActual,
+                                    );
+                                  },
                                 ),
-                              );
+                              ),
 
-                              if (ok != true) return;
+                              // Dropdown de seccion_org (solo organizador/admin)
+                              if (rolActual == 'organizador' || rolActual == 'admin') ...[
+                                const SizedBox(height: 6),
+                                DropdownButtonHideUnderline(
+                                  child: DropdownButton<String>(
+                                    isDense: true,
+                                    value: seccionActual.isEmpty ? 'sec_academica' : seccionActual,
+                                    items: const [
+                                      DropdownMenuItem(value: 'sec_academica', child: Text("sec_academica")),
+                                      DropdownMenuItem(value: 'sec_cultural', child: Text("sec_cultural")),
+                                      DropdownMenuItem(value: 'sec_deportiva', child: Text("sec_deportiva")),
+                                      DropdownMenuItem(value: 'sec_administrativa', child: Text("sec_administrativa")),
+                                    ],
+                                    onChanged: (nueva) async {
+                                      if (nueva == null) return;
+                                      if (nueva == seccionActual) return;
 
-                              await _cambiarRol(
-                                userId: doc.id,
-                                nuevoRol: nuevo,
-                                rolActual: rolActual,
-                              );
-                            },
+                                      final ok = await showDialog<bool>(
+                                        context: context,
+                                        builder: (_) => AlertDialog(
+                                          title: const Text("Cambiar sección"),
+                                          content: Text("¿Asignar \"$nueva\"?"),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () => Navigator.pop(context, false),
+                                              child: const Text("Cancelar"),
+                                            ),
+                                            ElevatedButton(
+                                              onPressed: () => Navigator.pop(context, true),
+                                              child: const Text("Confirmar"),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+
+                                      if (ok != true) return;
+
+                                      await _cambiarSeccionOrg(
+                                        userId: doc.id,
+                                        nuevaSeccion: nueva,
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
                         ),
+
+
                       ),
                     );
                   },
@@ -233,3 +327,4 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 }
+ 

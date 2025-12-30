@@ -18,6 +18,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   String userRol = 'estudiante';
+  String userSeccionOrg = ''; 
 
   @override
   void initState() {
@@ -31,8 +32,11 @@ class _HomeScreenState extends State<HomeScreen> {
       final doc = await FirebaseFirestore.instance.collection('usuarios').doc(user.uid).get();
       if (!mounted) return;
       setState(() {
-        userRol = doc.data()?['rol'] ?? 'estudiante';
+        final data = doc.data() ?? {};
+        userRol = (data['rol'] ?? 'estudiante').toString();
+        userSeccionOrg = (data['seccion_org'] ?? '').toString(); // <- NUEVO
       });
+
     }
   }
 
@@ -113,20 +117,20 @@ class _HomeScreenState extends State<HomeScreen> {
 
       ),
 
-      floatingActionButton: userRol == 'organizador'
-          ? FloatingActionButton(
-              // usa el color del theme
-              backgroundColor: cs.primary,
-              foregroundColor: cs.onPrimary,
-              child: const Icon(Icons.add),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const CreateEventScreen()),
-                );
-              },
-            )
-          : null,
+      floatingActionButton: (userRol == 'organizador' || userRol == 'admin')
+        ? FloatingActionButton(
+            backgroundColor: cs.primary,
+            foregroundColor: cs.onPrimary,
+            child: const Icon(Icons.add),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const CreateEventScreen()),
+              );
+            },
+          )
+        : null,
+
 
       body: Column(
         children: [

@@ -19,6 +19,8 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   final _picker = ImagePicker();
 
+  String _rol = '';
+  String _seccionOrg = '';
   String? _fotoUrl;      // url actual (Firestore)
   File? _fotoFile;       // foto seleccionada local
   bool _uploadingPhoto = false;
@@ -68,6 +70,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (!mounted) return;
   
       final data = doc.data() ?? {};
+      final rol = (data['rol'] ?? 'estudiante').toString();
+      final seccion = (data['seccion_org'] ?? '').toString();
+
   
       final nombre = (data['nombre'] ?? '').toString();
       final intereses = List<String>.from(data['intereses'] ?? []);
@@ -83,7 +88,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       setState(() {
         _fotoUrl = fotoUrl.isEmpty ? null : fotoUrl;
         _fotoOriginal = fotoUrl;
-  
+
+        _rol = rol;
+        _seccionOrg = seccion;
+
         _nombreController.text = nombre;
         misIntereses = intereses;
   
@@ -101,6 +109,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           'avisar_organizador': org,
           'cambios_evento': cambios,
         };
+
   
         _loading = false;
       });
@@ -116,6 +125,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  String _prettySeccion(String s) {
+          switch (s) {
+            case 'sec_academica': return 'Sección Académica';
+            case 'sec_cultural': return 'Sección Cultural';
+            case 'sec_deportiva': return 'Sección Deportiva';
+            case 'sec_administrativa': return 'Sección Administrativa (todas)';
+            default: return 'Sin sección asignada';
+          }
+  }
 
   //para elegir imagen de perfil
   Future<void> _pickFoto() async {
@@ -407,11 +425,47 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   controller: _nombreController,
                                   textInputAction: TextInputAction.done,
                                   decoration: const InputDecoration(
-                                    hintText: "Ej. Alexandra Bautista Coello",
+                                    hintText: "Ej. Rata Ratón Ramirez",
                                     prefixIcon: Icon(Icons.badge_outlined),
                                   ),
                                   onChanged: (_) => setState(() {}),
                                 ),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        //Cuenta
+                        const SizedBox(height: 14),
+                        Card(
+                          elevation: 6,
+                          shadowColor: Colors.black12,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                          child: Padding(
+                            padding: const EdgeInsets.all(14),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text("Cuenta", style: TextStyle(fontWeight: FontWeight.w900)),
+                                const SizedBox(height: 10),
+                                Row(
+                                  children: [
+                                    const Icon(Icons.verified_user_outlined),
+                                    const SizedBox(width: 10),
+                                    Text("Rol: $_rol"),
+                                  ],
+                                ),
+                                
+                               if (_rol == 'organizador' || _rol == 'admin') ...[
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.apartment_outlined),
+                                      const SizedBox(width: 10),
+                                      Expanded(child: Text("Sección: ${_prettySeccion(_seccionOrg)}")),
+                                    ],
+                                  ),
+                                ]
                               ],
                             ),
                           ),

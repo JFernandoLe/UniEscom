@@ -89,11 +89,28 @@ class AttendeesScreen extends StatelessWidget {
           .where('id_evento', isEqualTo: eventoId)
           .orderBy('fecha_registro', descending: true)
           .snapshots(),
-        
+
         builder: (context, snapshot) {
+          // 1) Muestra errores reales (índice/permisos)
+          if (snapshot.hasError) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(
+                  "Error cargando asistentes:\n${snapshot.error}",
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.red),
+                ),
+              ),
+            );
+          }
+
+          // 2) Loading
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
+
+          // 3) Empty
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
             return const Center(child: Text("Aún no hay alumnos registrados."));
           }
@@ -115,7 +132,7 @@ class AttendeesScreen extends StatelessWidget {
               );
             },
           );
-        },
+        }, //builder
       ),
     );
   }

@@ -10,6 +10,15 @@ class EventDetailScreen extends StatelessWidget {
 
   const EventDetailScreen({super.key, required this.evento});
 
+
+  bool _seccionPermiteCategoria(String seccion, String categoria) {
+    if (seccion == 'sec_administrativa') return true;
+    if (seccion == 'sec_academica' && categoria == 'Académico') return true;
+    if (seccion == 'sec_cultural' && categoria == 'Cultural') return true;
+    if (seccion == 'sec_deportiva' && categoria == 'Deportivo') return true;
+    return false;
+  }
+
   void _registrarAsistencia(BuildContext context) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
@@ -110,6 +119,7 @@ class EventDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
     final dt = evento.fechaHora;
     return Scaffold(
       appBar: AppBar(title: Text(evento.titulo)),
@@ -155,7 +165,13 @@ class EventDetailScreen extends StatelessWidget {
                   .collection('avisos')
                   .orderBy('fecha', descending: true)
                   .snapshots(),
-              builder: (context, snapshot) {
+               builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Text("Error cargando asistentes: ${snapshot.error}"),
+                  );
+                }
+
                 if (!snapshot.hasData || snapshot.data!.docs.isEmpty) return const SizedBox();
 
                 return Column(
@@ -183,76 +199,114 @@ class EventDetailScreen extends StatelessWidget {
             const Text("Descripción", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
             Text(evento.descripcion),
+            
             const Spacer(),
-            if (FirebaseAuth.instance.currentUser?.uid == evento.organizador)
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, foregroundColor: Colors.white),
-                      icon: const Icon(Icons.edit),
-                      label: const Text("EDITAR"),
-                      onPressed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => EditEventScreen(evento: evento)),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
-                      icon: const Icon(Icons.delete),
-                      label: const Text("CANCELAR"),
-                      onPressed: () {
-                        // Confirmación de seguridad
-                        showDialog(
-                          context: context,
-                          builder: (context) => AlertDialog(
-                            title: const Text("¿Cancelar evento?"),
-                            content: const Text("Esta acción eliminará el evento permanentemente."),
-                            actions: [
-                              TextButton(onPressed: () => Navigator.pop(context), child: const Text("No")),
-                              TextButton(
-                                onPressed: () async {
-                                  await FirebaseFirestore.instance.collection('eventos').doc(evento.id).delete();
-                                  if (context.mounted) {
-                                    Navigator.pop(context); // Cierra el dialogo
-                                    Navigator.pop(context); // Regresa al Home
-                                  }
-                                }, 
-                                child: const Text("Sí, eliminar", style: TextStyle(color: Colors.red))
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            if (FirebaseAuth.instance.currentUser?.uid == evento.organizador)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    icon: const Icon(Icons.people),
-                    label: const Text("VER LISTA DE ASISTENTES"),
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => AttendeesScreen(
-                            eventoId: evento.id,
-                            eventoNombre: evento.titulo,
+            // PERMISOS (admin u organizador por sección)
+            StreamBuilder<DocumentSnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('usuarios')
+                  .doc(uid)
+                  .snapshots(),
+              builder: (context, snapUser) {
+                if (snapUser.connectionState == ConnectionState.waiting) {
+                  return const SizedBox(); // no bloquees la UI
+                }
+
+                final data = (snapUser.data?.data() as Map<String, dynamic>?) ?? {};
+                final rol = (data['rol'] ?? 'estudiante').toString();
+                final seccion = (data['seccion_org'] ?? '').toString();
+
+                final canManage = (rol == 'admin') ||
+                    (rol == 'organizador' && _seccionPermiteCategoria(seccion, evento.categoria));
+
+                if (!canManage) return const SizedBox();
+
+                return Column(
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.orange,
+                              foregroundColor: Colors.white,
+                            ),
+                            icon: const Icon(Icons.edit),
+                            label: const Text("EDITAR"),
+                            onPressed: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => EditEventScreen(evento: evento)),
+                            ),
                           ),
                         ),
-                      );
-                    },
-                  ),
-                ),
-              ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red,
+                              foregroundColor: Colors.white,
+                            ),
+                            icon: const Icon(Icons.delete),
+                            label: const Text("CANCELAR"),
+                            onPressed: () {
+                              showDialog(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  title: const Text("¿Cancelar evento?"),
+                                  content: const Text("Esta acción eliminará el evento permanentemente."),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(context),
+                                      child: const Text("No"),
+                                    ),
+                                    TextButton(
+                                      onPressed: () async {
+                                        await FirebaseFirestore.instance
+                                            .collection('eventos')
+                                            .doc(evento.id)
+                                            .delete();
+                                        if (context.mounted) {
+                                          Navigator.pop(context);
+                                          Navigator.pop(context);
+                                        }
+                                      },
+                                      child: const Text("Sí, eliminar", style: TextStyle(color: Colors.red)),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        icon: const Icon(Icons.people),
+                        label: const Text("VER LISTA DE ASISTENTES"),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => AttendeesScreen(
+                                eventoId: evento.id,
+                                eventoNombre: evento.titulo,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+
+            // ✅ Botón registrarse (para todos)
             StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
               stream: _miAsistenciaStream(),
               builder: (context, snap) {
