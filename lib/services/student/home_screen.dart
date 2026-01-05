@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -19,40 +20,61 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   String userRol = 'estudiante';
+  List<String> interesesUsuario = [];
+  StreamSubscription? _userSubscription; // Suscripción para limpiar el listener
   
   // ESTADOS DE FILTRADO
   String categoriaSeleccionada = 'Todo';
   String ubicacionSeleccionada = 'Todas';
   DateTime? fechaSeleccionada;
+  bool mostrarPreferidos = false;
 
-  // Lista dinámica de ubicaciones
   List<String> listaUbicaciones = ['Todas'];
 
   @override
   void initState() {
     super.initState();
-    _checkRole();
-    _cargarUbicaciones(); // Carga las ubicaciones desde Firebase
+    _escucharDatosUsuario(); // Escucha cambios en tiempo real del perfil
+    _cargarUbicaciones(); 
   }
 
-  Future<void> _checkRole() async {
+  @override
+  void dispose() {
+    _userSubscription?.cancel(); // Cerramos el listener al destruir la pantalla
+    super.dispose();
+  }
+
+  // ESCUCHA CAMBIOS EN EL PERFIL (ROL E INTERESES) EN TIEMPO REAL
+  void _escucharDatosUsuario() {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
-      final doc = await FirebaseFirestore.instance.collection('usuarios').doc(user.uid).get();
-      if (!mounted) return;
-      setState(() {
-        final data = doc.data() ?? {};
-        userRol = (data['rol'] ?? 'estudiante').toString();
+      _userSubscription = FirebaseFirestore.instance
+          .collection('usuarios')
+          .doc(user.uid)
+          .snapshots()
+          .listen((doc) {
+        if (doc.exists && mounted) {
+          setState(() {
+            final data = doc.data() ?? {};
+            userRol = (data['rol'] ?? 'estudiante').toString();
+            interesesUsuario = List<String>.from(data['intereses'] ?? []);
+            
+            // Si el usuario quita intereses y "Para ti" estaba activo, 
+            // validamos que no se quede intentando filtrar una lista vacía
+            if (interesesUsuario.isEmpty) {
+              mostrarPreferidos = false;
+            }
+          });
+        }
       });
     }
   }
 
-  // OBTIENE UBICACIONES ÚNICAS DE LA COLECCIÓN DE EVENTOS
   Future<void> _cargarUbicaciones() async {
     final snapshot = await FirebaseFirestore.instance.collection('eventos').get();
     final sedes = snapshot.docs
         .map((doc) => doc['lugar'].toString())
-        .toSet() // Elimina duplicados
+        .toSet() 
         .toList();
     
     if (mounted) {
@@ -67,6 +89,7 @@ class _HomeScreenState extends State<HomeScreen> {
       categoriaSeleccionada = 'Todo';
       ubicacionSeleccionada = 'Todas';
       fechaSeleccionada = null;
+      mostrarPreferidos = false;
     });
   }
 
@@ -74,10 +97,15 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
-    // CONSTRUCCIÓN DE LA QUERY CORREGIDA
+    // CONSTRUCCIÓN DE LA QUERY
     Query query = FirebaseFirestore.instance.collection('eventos');
 
-    if (categoriaSeleccionada != 'Todo') {
+    // Prioridad 1: Filtro "Para ti" (si hay intereses)
+    if (mostrarPreferidos && interesesUsuario.isNotEmpty) {
+      query = query.where('categoria', whereIn: interesesUsuario);
+    } 
+    // Prioridad 2: Filtro por categoría manual
+    else if (categoriaSeleccionada != 'Todo') {
       query = query.where('categoria', isEqualTo: categoriaSeleccionada);
     }
 
@@ -86,7 +114,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     if (fechaSeleccionada != null) {
-      // Ajuste al nombre del campo 'fechaHora' según tu captura
       DateTime inicio = DateTime(fechaSeleccionada!.year, fechaSeleccionada!.month, fechaSeleccionada!.day);
       DateTime fin = inicio.add(const Duration(days: 1));
       
@@ -108,7 +135,10 @@ class _HomeScreenState extends State<HomeScreen> {
           ? FloatingActionButton(
               backgroundColor: cs.primary,
               child: const Icon(Icons.add),
-              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const CreateEventScreen())),
+              onPressed: () async {
+                await Navigator.push(context, MaterialPageRoute(builder: (context) => const CreateEventScreen()));
+                _cargarUbicaciones();
+              },
             )
           : null,
       body: Column(
@@ -123,7 +153,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    // Filtro Ubicación Dinámico
                     Expanded(
                       flex: 2,
                       child: DropdownButtonFormField<String>(
@@ -135,7 +164,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    // Filtro Fecha
                     Expanded(
                       flex: 2,
                       child: OutlinedButton.icon(
@@ -155,7 +183,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         },
                       ),
                     ),
-                    if (categoriaSeleccionada != 'Todo' || ubicacionSeleccionada != 'Todas' || fechaSeleccionada != null)
+                    if (categoriaSeleccionada != 'Todo' || ubicacionSeleccionada != 'Todas' || fechaSeleccionada != null || mostrarPreferidos)
                       IconButton(icon: const Icon(Icons.filter_list_off, color: Colors.red), onPressed: _limpiarFiltros),
                   ],
                 ),
@@ -168,7 +196,7 @@ class _HomeScreenState extends State<HomeScreen> {
             child: StreamBuilder<QuerySnapshot>(
               stream: query.snapshots(),
               builder: (context, snapshot) {
-                if (snapshot.hasError) return Center(child: Text("Error: ${snapshot.error}. Revisa si falta un índice en la consola de Firebase."));
+                if (snapshot.hasError) return const Center(child: Text("Error al cargar eventos."));
                 if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
 
                 if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
@@ -191,24 +219,45 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // --- WIDGETS AUXILIARES ---
-
   Widget _buildCategoryFilter(ColorScheme cs) {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
-        children: ['Todo', 'Académico', 'Cultural', 'Deportivo'].map((cat) {
-          final selected = categoriaSeleccionada == cat;
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: FilterChip(
-              label: Text(cat),
-              selected: selected,
-              onSelected: (_) => setState(() => categoriaSeleccionada = cat),
-              selectedColor: cs.primary.withOpacity(0.2),
+        children: [
+          // BOTÓN "PARA TI" (Solo aparece si el usuario tiene intereses seleccionados)
+          if (interesesUsuario.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: FilterChip(
+                avatar: Icon(Icons.auto_awesome, size: 16, color: mostrarPreferidos ? Colors.white : cs.primary),
+                label: const Text("Para ti"),
+                selected: mostrarPreferidos,
+                onSelected: (val) => setState(() {
+                  mostrarPreferidos = val;
+                  if (val) categoriaSeleccionada = 'Todo'; 
+                }),
+                selectedColor: cs.primary,
+                labelStyle: TextStyle(color: mostrarPreferidos ? Colors.white : Colors.black),
+              ),
             ),
-          );
-        }).toList(),
+
+          // LISTA DE CATEGORÍAS FIJAS
+          ...['Todo', 'Académico', 'Cultural', 'Deportivo'].map((cat) {
+            final selected = categoriaSeleccionada == cat && !mostrarPreferidos;
+            return Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: FilterChip(
+                label: Text(cat),
+                selected: selected,
+                onSelected: (_) => setState(() {
+                  categoriaSeleccionada = cat;
+                  mostrarPreferidos = false; 
+                }),
+                selectedColor: cs.primary.withOpacity(0.2),
+              ),
+            );
+          }).toList(),
+        ],
       ),
     );
   }
