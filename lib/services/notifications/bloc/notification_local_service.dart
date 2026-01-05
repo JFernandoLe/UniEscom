@@ -14,15 +14,23 @@ class LocalNotificationService {
   );
 
   Future<void> init() async {
+    // Configuración para Android
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const initSettings = InitializationSettings(android: androidInit);
+
+    // Configuración para iOS (Fernando: Agregue los ajustes para IOS)
+    const iosInit = DarwinInitializationSettings(
+      requestAlertPermission: true,
+      requestBadgePermission: true,
+      requestSoundPermission: true,
+    );
+
+    // Combinar ambas en InitializationSettings
+    const initSettings = InitializationSettings(
+      android: androidInit,
+      iOS: iosInit, 
+    );
 
     await _plugin.initialize(initSettings);
-
-    // Crear canal Android (importante)
-    await _plugin
-        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
-        ?.createNotificationChannel(_channel);
   }
 
   Future<void> show({
