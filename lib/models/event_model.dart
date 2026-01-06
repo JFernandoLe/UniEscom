@@ -23,7 +23,7 @@ class EventModel {
     required this.categoria,
   });
 
-  // Mapeo de datos desde Firestore
+
   factory EventModel.fromFirestore(DocumentSnapshot doc) {
     Map data = doc.data() as Map;
     final tsFechaHora = data['fechaHora'] as Timestamp?;
@@ -34,12 +34,10 @@ class EventModel {
       id: doc.id,
       titulo: data['titulo'] ?? '',
       descripcion: data['descripcion'] ?? '',
-      //fechaHora: (data['fechaHora'] as Timestamp).toDate(), 
+      
       fechaHora: fechaHora,
 
-      // compatibilidad: si no existe 'fecha', usa la parte de fecha de fechaHora
       fecha: (tsFecha ?? Timestamp.fromDate(DateTime(fechaHora.year, fechaHora.month, fechaHora.day))).toDate(),
-      // compatibilidad: si no existe 'hora', la calculas de fechaHora
       hora: (data['hora'] ?? '${fechaHora.hour.toString().padLeft(2,'0')}:${fechaHora.minute.toString().padLeft(2,'0')}').toString(),
 
       lugar: data['lugar'] ?? '',

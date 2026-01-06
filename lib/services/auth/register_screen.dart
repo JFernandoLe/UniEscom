@@ -63,9 +63,6 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
       return false;
     }
 
-    // ✅ OPCIONAL: fuerza dominio institucional.
-    // Si tu escuela usa @alumno.ipn.mx, déjalo así.
-    // Si también aceptan otro (ej. @ipn.mx), agrega OR.
     final emailLower = email.toLowerCase();
     if (!emailLower.endsWith("@alumno.ipn.mx")) {
       _showSnack("Usa tu correo institucional @alumno.ipn.mx");

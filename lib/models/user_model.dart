@@ -15,7 +15,6 @@ class UserModel {
     this.fotoUrl,
   });
 
-  // Para convertir los datos de Firebase a un objeto de Dart
   factory UserModel.fromMap(Map<String, dynamic> data, String id) {
     return UserModel(
       uid: id,

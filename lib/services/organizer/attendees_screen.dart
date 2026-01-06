@@ -80,9 +80,6 @@ class AttendeesScreen extends StatelessWidget {
         ],
       ),
 
-      // OPCIÓN A (rápida): usar nombre/email guardados en "asistencias"
-      // Requiere que cuando registras asistencia guardes:
-      // 'nombre_usuario' y 'email_usuario' en el doc de asistencias.
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
           .collection('asistencias')
@@ -91,7 +88,6 @@ class AttendeesScreen extends StatelessWidget {
           .snapshots(),
 
         builder: (context, snapshot) {
-          // 1) Muestra errores reales (índice/permisos)
           if (snapshot.hasError) {
             return Center(
               child: Padding(
