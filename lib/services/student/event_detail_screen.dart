@@ -3,6 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:uni_escom/services/organizer/attendees_screen.dart';
 import 'package:uni_escom/services/organizer/edit_event_screen.dart';
+import 'package:uni_escom/services/notifications/notification_hooks.dart';
+import 'package:uni_escom/services/api/backend_client.dart';
 import '../../models/event_model.dart';
 
 class EventDetailScreen extends StatelessWidget {
@@ -46,6 +48,42 @@ class EventDetailScreen extends StatelessWidget {
         'nombre_usuario': nombreUsuario,
         'email_usuario': emailUsuario,
       }, SetOptions(merge: true));
+
+      // Disparar notificación inmediata y programar recordatorios desde el clic
+      await NotificationHooks.onEventRegistration(
+        eventId: evento.id,
+        eventTitle: evento.titulo,
+        eventDate: evento.fechaHora,
+      );
+
+      // Enviar push remoto vía backend (FCM)
+      try {
+        await BackendClient().sendRegistrationNotification(
+          uid: user.uid,
+          eventId: evento.id,
+          eventTitle: evento.titulo,
+        );
+
+        // Notificar al organizador
+        await BackendClient().notifyOrganizerRegistration(
+          eventId: evento.id,
+          actorUid: user.uid,
+          actorName: nombreUsuario,
+          eventTitle: evento.titulo,
+        );
+
+        // Programar recordatorios en el backend (cada 3 días + 2h antes)
+        await BackendClient().scheduleServerReminders(
+          uid: user.uid,
+          eventId: evento.id,
+          eventTitle: evento.titulo,
+          eventDate: evento.fechaHora,
+          intervalDays: 3,
+          // testEveryMinutes: 2, // Descomenta para pruebas rápidas
+        );
+      } catch (e) {
+        debugPrint('Backend push error: $e');
+      }
 
       if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("¡Registrado con éxito!"), backgroundColor: Colors.green));
     } catch (e) { if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red)); }

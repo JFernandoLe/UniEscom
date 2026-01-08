@@ -17,7 +17,9 @@ void main() async {
     MultiBlocProvider(
     providers: [
       BlocProvider(
-        create: (_) => NotificationsBloc()..add(const NotificationsInitRequested()),
+        create: (_) => NotificationsBloc()
+          ..add(const NotificationsInitRequested())
+          ..add(const NotificationsRequestPermission()),
       ), 
     ],
     child: const UniEscomApp())
